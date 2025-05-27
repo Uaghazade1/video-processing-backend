@@ -39,18 +39,30 @@ const jobs = new Map();
 // Download video from URL
 async function downloadVideo(url, outputPath) {
   try {
-    console.log(`Downloading: ${url}`);
+    console.log(`Trying to download: ${url}`);
+    console.log(`Output path: ${outputPath}`);
+    
     const response = await fetch(url);
+    
+    console.log(`Response status: ${response.status}`);
+    console.log(`Response headers:`, Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
     const buffer = await response.arrayBuffer();
+    console.log(`Downloaded ${buffer.byteLength} bytes`);
+    
     await fs.writeFile(outputPath, Buffer.from(buffer));
-    console.log(`Download completed: ${url}`);
+    
+    // Check file size after writing
+    const stats = await fs.stat(outputPath);
+    console.log(`File written: ${stats.size} bytes at ${outputPath}`);
+    
+    console.log(`Download completed successfully: ${url}`);
   } catch (error) {
-    console.error(`Download failed: ${url}`, error);
+    console.error(`Download failed for ${url}:`, error);
     throw error;
   }
 }
@@ -154,36 +166,73 @@ function concatenateVideos(ugcPath, demoPath, outputPath) {
   });
 }
 
-// Simple concatenation - minimal processing
+// Simple concatenation - with re-encoding for compatibility
 function concatenateVideosSimple(ugcPath, demoPath, outputPath) {
   return new Promise((resolve, reject) => {
     console.log('Starting simple video concatenation...');
+    console.log(`UGC path: ${ugcPath}`);
+    console.log(`Demo path: ${demoPath}`);
+    console.log(`Output path: ${outputPath}`);
     
-    // Create a simple list file
-    const listContent = `file '${ugcPath}'\nfile '${demoPath}'`;
-    const listPath = outputPath + '.list';
+    // Check if input files exist and get their info
+    if (!fs.existsSync(ugcPath)) {
+      reject(new Error(`UGC file not found: ${ugcPath}`));
+      return;
+    }
     
-    fs.writeFileSync(listPath, listContent);
+    if (!fs.existsSync(demoPath)) {
+      reject(new Error(`Demo file not found: ${demoPath}`));
+      return;
+    }
     
+    const ugcStats = fs.statSync(ugcPath);
+    const demoStats = fs.statSync(demoPath);
+    console.log(`UGC file size: ${ugcStats.size} bytes`);
+    console.log(`Demo file size: ${demoStats.size} bytes`);
+    
+    // Use filter_complex for reliable concatenation with re-encoding
     ffmpeg()
-      .input(listPath)
-      .inputOptions(['-f', 'concat', '-safe', '0'])
+      .input(ugcPath)
+      .input(demoPath)
+      .complexFilter([
+        // Ensure both videos have same format and add silent audio to UGC if needed
+        '[0:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,fps=30[v0]',
+        '[1:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,fps=30[v1]',
+        'anullsrc=channel_layout=stereo:sample_rate=44100[silent]',
+        '[v0][silent][v1][1:a]concat=n=2:v=1:a=1[outv][outa]'
+      ])
       .outputOptions([
-        '-c', 'copy', // Copy streams without re-encoding (fastest)
-        '-avoid_negative_ts', 'make_zero'
+        '-map', '[outv]',
+        '-map', '[outa]',
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-c:a', 'aac',
+        '-b:a', '128k'
       ])
       .output(outputPath)
+      .on('start', (commandLine) => {
+        console.log('FFmpeg command: ' + commandLine);
+      })
       .on('progress', (progress) => {
-        console.log('Simple concatenation progress:', progress.percent);
+        console.log('Concatenation progress:', progress.percent || 'unknown');
       })
       .on('end', () => {
         console.log('Simple concatenation completed');
-        fs.unlinkSync(listPath); // Clean up list file
+        
+        // Check output file
+        if (fs.existsSync(outputPath)) {
+          const outputStats = fs.statSync(outputPath);
+          console.log(`Output file created: ${outputStats.size} bytes`);
+        } else {
+          console.error('Output file was not created!');
+        }
+        
         resolve();
       })
       .on('error', (error) => {
         console.error('Simple concatenation failed:', error);
-        if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
+        console.error('FFmpeg stderr:', error.message);
         reject(error);
       })
       .run();
@@ -233,8 +282,24 @@ app.post('/process-video', async (req, res) => {
   try {
     const { ugcVideoUrl, productDemoUrl, hook, textAlignment } = req.body;
     
+    console.log('=== NEW VIDEO PROCESSING REQUEST ===');
+    console.log('Job ID:', jobId);
+    console.log('UGC Video URL:', ugcVideoUrl);
+    console.log('Demo Video URL:', productDemoUrl);
+    console.log('Hook:', hook);
+    console.log('Text Alignment:', textAlignment);
+    
     if (!ugcVideoUrl || !productDemoUrl || !hook || !textAlignment) {
       return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    // Validate URLs
+    try {
+      new URL(ugcVideoUrl);
+      new URL(productDemoUrl);
+    } catch (urlError) {
+      console.error('Invalid URL provided:', urlError);
+      return res.status(400).json({ error: 'Invalid video URLs provided' });
     }
 
     // Initialize job
