@@ -60,7 +60,7 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
       options: {
         text: line, // Use individual line, not formattedText
         fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-        fontsize: 42,
+        fontsize: 32,
         fontcolor: 'white',
         x: '(w-text_w)/2',
         y: `(${baseY})+${i * lineSpacing}`,
@@ -69,9 +69,6 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
         shadowcolor: 'black',
         shadowx: 2,
         shadowy: 2,
-        box: 1,
-        boxcolor: 'black@0.3',
-        boxborderw: 15,
       },
     }));
 
