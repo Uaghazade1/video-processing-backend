@@ -77,39 +77,116 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
   });
 }
 
-// SIMPLE concat using input files directly
+// ROBUST concat that handles audio/video format differences
 function concatenateVideos(ugcPath, demoPath, outputPath) {
   return new Promise((resolve, reject) => {
-    console.log('🔗 Starting simple video concatenation...');
+    console.log('🔗 Starting ROBUST video concatenation...');
     console.log(`  UGC: ${ugcPath}`);
     console.log(`  Demo: ${demoPath}`);
     console.log(`  Output: ${outputPath}`);
 
-    // Create a simple concat list
-    const listContent = `file '${ugcPath}'\nfile '${demoPath}'`;
+    // First, let's normalize both videos to have compatible formats
+    const normalizedUgcPath = ugcPath.replace('.mp4', '_normalized.mp4');
+    const normalizedDemoPath = demoPath.replace('.mp4', '_normalized.mp4');
+
+    // Step 1: Normalize UGC video
+    normalizeVideo(ugcPath, normalizedUgcPath)
+      .then(() => {
+        console.log('✅ UGC video normalized');
+        // Step 2: Normalize Demo video
+        return normalizeVideo(demoPath, normalizedDemoPath);
+      })
+      .then(() => {
+        console.log('✅ Demo video normalized');
+        // Step 3: Simple concat of normalized videos
+        return simpleConcat(normalizedUgcPath, normalizedDemoPath, outputPath);
+      })
+      .then(() => {
+        console.log('✅ Videos concatenated successfully');
+        // Cleanup normalized files
+        fs.remove(normalizedUgcPath).catch(() => {});
+        fs.remove(normalizedDemoPath).catch(() => {});
+        resolve();
+      })
+      .catch((error) => {
+        console.error('❌ Concatenation process failed:', error.message);
+        // Cleanup on failure
+        fs.remove(normalizedUgcPath).catch(() => {});
+        fs.remove(normalizedDemoPath).catch(() => {});
+        reject(error);
+      });
+  });
+}
+
+// Normalize a single video (ensure audio track, standard format)
+function normalizeVideo(inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    console.log(`🔧 Normalizing video: ${path.basename(inputPath)}`);
+    
+    ffmpeg(inputPath)
+      .outputOptions([
+        '-c:v', 'libx264',
+        '-preset', 'fast',
+        '-crf', '23',
+        '-vf', 'scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,fps=30',
+        '-c:a', 'aac',
+        '-ar', '44100',
+        '-ac', '2',
+        '-b:a', '128k',
+        '-shortest',
+        '-f', 'mp4',
+        '-movflags', '+faststart'
+      ])
+      .output(outputPath)
+      .on('start', (cmd) => {
+        console.log(`🚀 Normalize command: ${cmd.substring(0, 100)}...`);
+      })
+      .on('end', () => {
+        console.log(`✅ Normalized: ${path.basename(outputPath)}`);
+        resolve();
+      })
+      .on('error', (error) => {
+        console.error(`❌ Normalize failed for ${path.basename(inputPath)}:`, error.message);
+        reject(error);
+      })
+      .run();
+  });
+}
+
+// Simple concatenation of two normalized videos
+function simpleConcat(video1Path, video2Path, outputPath) {
+  return new Promise((resolve, reject) => {
+    console.log('🔗 Simple concat of normalized videos...');
+    
+    const listContent = `file '${video1Path}'\nfile '${video2Path}'`;
     const listPath = path.join(TEMP_DIR, `concat-${Date.now()}.txt`);
     
     fs.writeFileSync(listPath, listContent);
-    console.log(`📝 Created concat list:\n${listContent}`);
+    console.log(`📝 Concat list created`);
 
     ffmpeg()
       .input(listPath)
       .inputOptions(['-f', 'concat', '-safe', '0'])
       .outputOptions([
-        '-c', 'copy',                    // Don't re-encode, just copy
-        '-avoid_negative_ts', 'make_zero'
+        '-c', 'copy',  // Since videos are already normalized, just copy
+        '-movflags', '+faststart'
       ])
       .output(outputPath)
-      .on('start', (cmd) => console.log(`🚀 FFmpeg command: ${cmd}`))
-      .on('progress', (progress) => console.log(`⏳ Progress: ${progress.percent || 'unknown'}%`))
+      .on('start', (cmd) => {
+        console.log(`🚀 Concat command: ${cmd.substring(0, 100)}...`);
+      })
+      .on('progress', (progress) => {
+        if (progress.percent) {
+          console.log(`⏳ Concat progress: ${Math.round(progress.percent)}%`);
+        }
+      })
       .on('end', () => {
         fs.remove(listPath); // cleanup
-        console.log('✅ Concatenation completed!');
+        console.log('✅ Simple concatenation completed!');
         
-        // Verify the output
         if (fs.existsSync(outputPath)) {
           const outputStats = fs.statSync(outputPath);
-          console.log(`📊 Output file size: ${outputStats.size} bytes`);
+          console.log(`📊 Final output size: ${(outputStats.size / 1024 / 1024).toFixed(2)}MB`);
           resolve();
         } else {
           reject(new Error('Output file was not created'));
@@ -117,7 +194,7 @@ function concatenateVideos(ugcPath, demoPath, outputPath) {
       })
       .on('error', (error) => {
         fs.remove(listPath); // cleanup
-        console.error('❌ Concatenation failed:', error.message);
+        console.error('❌ Simple concat failed:', error.message);
         reject(error);
       })
       .run();
