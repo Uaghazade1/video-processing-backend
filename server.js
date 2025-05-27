@@ -49,7 +49,7 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
     const lineSpacing = 45;
 
     const baseY =
-      alignment === 'top' ? 100 :
+      alignment === 'top' ? 170 :
       alignment === 'bottom' ? 'h-250' :
       '(h/2 - ' + ((lines.length - 1) * lineSpacing) / 2 + ')';
 
@@ -61,7 +61,7 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
       options: {
         text: line,
         fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-        fontsize: 32,
+        fontsize: 34,
         fontcolor: 'white',
         x: '(w-text_w)/2',
         y: `(${baseY})+${i * lineSpacing}`,
