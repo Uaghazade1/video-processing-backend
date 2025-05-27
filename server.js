@@ -72,14 +72,13 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
           shadowy: 2,
           box: 1,                          
           boxcolor: 'black@0.3',           
-          boxborderw: 15,
-          text_align: 'center'             // Center align each line
+          boxborderw: 15
         }
       })
       .outputOptions(['-preset', 'fast', '-crf', '23'])
       .output(outputPath)
       .on('end', () => {
-        console.log('✅ Text overlay completed with center alignment and emoji support');
+        console.log('✅ Text overlay completed with emoji support');
         resolve();
       })
       .on('error', (error) => {
@@ -120,8 +119,8 @@ function wrapText(text, maxCharsPerLine) {
   // Limit to 3 lines max for mobile video
   const finalLines = lines.slice(0, 3);
   
-  // Join with newline characters for FFmpeg
-  return finalLines.join('\n');
+  // Join with escaped newline characters for FFmpeg
+  return finalLines.join('\\n');
 }
 
 // ROBUST concat that handles audio/video format differences
