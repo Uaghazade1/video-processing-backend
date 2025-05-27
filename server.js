@@ -18,10 +18,17 @@ app.use(express.json({ limit: '50mb' }));
 const TEMP_DIR = '/tmp';
 
 // Cloudflare R2 Configuration
+console.log('R2 Environment Variables:');
+console.log('CLOUDFLARE_ACCOUNT_ID:', process.env.CLOUDFLARE_ACCOUNT_ID);
+console.log('CLOUDFLARE_ACCESS_KEY_ID:', process.env.CLOUDFLARE_ACCESS_KEY_ID ? 'SET' : 'MISSING');
+console.log('CLOUDFLARE_SECRET_ACCESS_KEY:', process.env.CLOUDFLARE_SECRET_ACCESS_KEY ? 'SET' : 'MISSING');
+console.log('CLOUDFLARE_BUCKET_NAME:', process.env.CLOUDFLARE_BUCKET_NAME);
+console.log('CLOUDFLARE_PUBLIC_DOMAIN:', process.env.CLOUDFLARE_PUBLIC_DOMAIN);
+
 const r2 = new AWS.S3({
-  endpoint: process.env.R2_ENDPOINT,
-  accessKeyId: process.env.R2_ACCESS_KEY_ID,
-  secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  accessKeyId: process.env.CLOUDFLARE_ACCESS_KEY_ID,
+  secretAccessKey: process.env.CLOUDFLARE_SECRET_ACCESS_KEY,
   region: 'auto',
   signatureVersion: 'v4',
 });
@@ -187,18 +194,29 @@ function concatenateVideosSimple(ugcPath, demoPath, outputPath) {
 async function uploadToR2(filePath, fileName) {
   try {
     console.log(`Uploading to R2: ${fileName}`);
+    console.log(`Using bucket: ${process.env.CLOUDFLARE_BUCKET_NAME}`);
+    
+    if (!process.env.CLOUDFLARE_BUCKET_NAME) {
+      throw new Error('CLOUDFLARE_BUCKET_NAME environment variable is not set');
+    }
     
     const fileBuffer = await fs.readFile(filePath);
     
     const uploadParams = {
-      Bucket: process.env.R2_BUCKET_NAME,
+      Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
       Key: `generated-videos/${fileName}`,
       Body: fileBuffer,
       ContentType: 'video/mp4',
     };
 
+    console.log('Upload params:', { 
+      Bucket: uploadParams.Bucket, 
+      Key: uploadParams.Key, 
+      ContentType: uploadParams.ContentType 
+    });
+
     const result = await r2.upload(uploadParams).promise();
-    const publicUrl = `${process.env.R2_PUBLIC_URL}/generated-videos/${fileName}`;
+    const publicUrl = `${process.env.CLOUDFLARE_PUBLIC_DOMAIN}/generated-videos/${fileName}`;
     
     console.log(`Upload completed: ${publicUrl}`);
     return publicUrl;
