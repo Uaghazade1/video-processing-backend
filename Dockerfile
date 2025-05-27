@@ -21,8 +21,8 @@ COPY . .
 # Create temp directory
 RUN mkdir -p /tmp
 
-# Expose port
-EXPOSE 3001
+# Railway uses dynamic ports, so don't expose specific port
+# Railway will set PORT env variable automatically
 
 # Start the application
 CMD ["npm", "start"] 
