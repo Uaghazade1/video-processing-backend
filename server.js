@@ -49,39 +49,50 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
     if (alignment === 'top') textPosition = '(w-text_w)/2:120';  
     if (alignment === 'bottom') textPosition = '(w-text_w)/2:h-200';  
 
-    // Clean text and implement manual word wrapping
-    const cleanText = text.replace(/['"]/g, '');
-    const wrappedText = wrapText(cleanText, 25); // ~25 characters per line for mobile video
+    // Clean text
+    const cleanText = text.replace(/['"]/g, '').slice(0, 100);
     
-    console.log(`📝 Adding text overlay: "${wrappedText}" at ${alignment}`);
+    // Create a temporary text file for better text handling
+    const textFilePath = path.join(TEMP_DIR, `text-${Date.now()}.txt`);
+    fs.writeFileSync(textFilePath, cleanText);
+    
+    console.log(`📝 Adding text overlay: "${cleanText}" at ${alignment}`);
 
     ffmpeg(inputPath)
-      .videoFilters({
-        filter: 'drawtext',
-        options: {
-          text: wrappedText,
-          fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-          fontsize: 42,                    // Slightly smaller for multi-line
-          fontcolor: 'white',
-          x: textPosition.split(':')[0],
-          y: textPosition.split(':')[1],
-          borderw: 4,                      
-          bordercolor: 'black',
-          shadowcolor: 'black',
-          shadowx: 2,                      
-          shadowy: 2,
-          box: 1,                          
-          boxcolor: 'black@0.3',           
-          boxborderw: 15                   
+      .videoFilters([
+        {
+          filter: 'drawtext',
+          options: {
+            textfile: textFilePath,
+            fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+            fontsize: 40,
+            fontcolor: 'white',
+            x: '(w-tw)/2',                   // Center horizontally
+            y: alignment === 'top' ? '120' : 
+               alignment === 'bottom' ? 'h-th-120' : 
+               '(h-th)/2',                   // Center vertically or position
+            borderw: 3,
+            bordercolor: 'black',
+            shadowcolor: 'black',
+            shadowx: 2,
+            shadowy: 2,
+            box: 1,
+            boxcolor: 'black@0.4',
+            boxborderw: 10
+          }
         }
-      })
+      ])
       .outputOptions(['-preset', 'fast', '-crf', '23'])
       .output(outputPath)
       .on('end', () => {
-        console.log('✅ Text overlay completed with proper line wrapping');
+        // Clean up text file
+        fs.remove(textFilePath).catch(() => {});
+        console.log('✅ Text overlay completed with textfile approach');
         resolve();
       })
       .on('error', (error) => {
+        // Clean up text file on error
+        fs.remove(textFilePath).catch(() => {});
         console.error('❌ Text overlay failed:', error.message);
         reject(error);
       })
