@@ -49,7 +49,7 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
     if (alignment === 'top') textPosition = '(w-text_w)/2:120';  
     if (alignment === 'bottom') textPosition = '(w-text_w)/2:h-200';  
 
-    // Clean text and implement manual word wrapping
+    // Clean text but preserve emojis - only remove problematic quotes
     const cleanText = text.replace(/['"]/g, '');
     const wrappedText = wrapText(cleanText, 25); // ~25 characters per line for mobile video
     
@@ -61,7 +61,7 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
         options: {
           text: wrappedText,
           fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-          fontsize: 42,                    // Slightly smaller for multi-line
+          fontsize: 42,                    
           fontcolor: 'white',
           x: textPosition.split(':')[0],
           y: textPosition.split(':')[1],
@@ -72,13 +72,14 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
           shadowy: 2,
           box: 1,                          
           boxcolor: 'black@0.3',           
-          boxborderw: 15                   
+          boxborderw: 15,
+          text_align: 'center'             // Center align each line
         }
       })
       .outputOptions(['-preset', 'fast', '-crf', '23'])
       .output(outputPath)
       .on('end', () => {
-        console.log('✅ Text overlay completed with proper line wrapping');
+        console.log('✅ Text overlay completed with center alignment and emoji support');
         resolve();
       })
       .on('error', (error) => {
