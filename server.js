@@ -166,10 +166,10 @@ function concatenateVideos(ugcPath, demoPath, outputPath) {
   });
 }
 
-// Ultra simple concatenation - fallback to UGC only if concat fails
+// Ultra simple concatenation - better error handling and fallback
 function concatenateVideosSimple(ugcPath, demoPath, outputPath) {
   return new Promise((resolve, reject) => {
-    console.log('Starting ultra simple video concatenation...');
+    console.log('Starting enhanced simple video concatenation...');
     console.log(`UGC path: ${ugcPath}`);
     console.log(`Demo path: ${demoPath}`);
     console.log(`Output path: ${outputPath}`);
@@ -190,81 +190,141 @@ function concatenateVideosSimple(ugcPath, demoPath, outputPath) {
     console.log(`UGC file size: ${ugcStats.size} bytes`);
     console.log(`Demo file size: ${demoStats.size} bytes`);
     
-    // Try simple copy concat first (fastest, minimal resources)
-    const listContent = `file '${ugcPath}'\nfile '${demoPath}'`;
-    const listPath = outputPath + '.list';
-    
-    console.log(`Creating concat list file: ${listPath}`);
-    console.log(`List content:\n${listContent}`);
-    
-    fs.writeFileSync(listPath, listContent);
-    
-    // Set a timeout to prevent hanging
-    const timeoutId = setTimeout(() => {
-      console.log('FFmpeg timeout - falling back to UGC only');
+    // Method 1: Try with filter_complex (more compatible)
+    const tryFilterComplexConcat = () => {
+      console.log('Trying filter_complex concatenation...');
       
-      // Clean up and copy UGC as final video
-      if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
+      ffmpeg()
+        .input(ugcPath)
+        .input(demoPath)
+        .complexFilter([
+          '[0:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1[v0]',
+          '[1:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1[v1]',
+          '[0:a]aformat=sample_rates=44100:channel_layouts=stereo[a0]',
+          '[1:a]aformat=sample_rates=44100:channel_layouts=stereo[a1]',
+          '[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]'
+        ])
+        .outputOptions([
+          '-map', '[outv]',
+          '-map', '[outa]',
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-crf', '28',
+          '-c:a', 'aac',
+          '-b:a', '128k',
+          '-movflags', 'faststart'
+        ])
+        .output(outputPath)
+        .on('start', (commandLine) => {
+          console.log('Filter complex FFmpeg command: ' + commandLine);
+        })
+        .on('progress', (progress) => {
+          console.log('Filter complex progress:', progress.percent || 'unknown');
+        })
+        .on('end', () => {
+          console.log('Filter complex concatenation completed successfully');
+          
+          // Verify output file exists and has reasonable size
+          if (fs.existsSync(outputPath)) {
+            const outputStats = fs.statSync(outputPath);
+            console.log(`Filter complex output file created: ${outputStats.size} bytes`);
+            
+            if (outputStats.size > ugcStats.size) {
+              console.log('✅ Filter complex concatenation successful - file size increased');
+              resolve();
+            } else {
+              console.log('⚠️ Filter complex output seems too small, trying fallback...');
+              tryListConcat();
+            }
+          } else {
+            console.error('Filter complex output file was not created!');
+            tryListConcat();
+          }
+        })
+        .on('error', (error) => {
+          console.error('Filter complex concatenation failed:', error);
+          tryListConcat();
+        })
+        .run();
+    };
+    
+    // Method 2: Try simple list concat
+    const tryListConcat = () => {
+      console.log('Trying list concatenation...');
+      
+      const listContent = `file '${ugcPath}'\nfile '${demoPath}'`;
+      const listPath = outputPath + '.list';
+      
+      console.log(`Creating concat list file: ${listPath}`);
+      console.log(`List content:\n${listContent}`);
+      
+      fs.writeFileSync(listPath, listContent);
+      
+      ffmpeg()
+        .input(listPath)
+        .inputOptions(['-f', 'concat', '-safe', '0'])
+        .outputOptions([
+          '-c', 'copy',
+          '-avoid_negative_ts', 'make_zero',
+          '-fflags', '+genpts'
+        ])
+        .output(outputPath)
+        .on('start', (commandLine) => {
+          console.log('List concat FFmpeg command: ' + commandLine);
+        })
+        .on('progress', (progress) => {
+          console.log('List concat progress:', progress.percent || 'unknown');
+        })
+        .on('end', () => {
+          console.log('List concatenation completed successfully');
+          
+          // Clean up list file
+          if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
+          
+          // Verify output
+          if (fs.existsSync(outputPath)) {
+            const outputStats = fs.statSync(outputPath);
+            console.log(`List concat output file created: ${outputStats.size} bytes`);
+            
+            if (outputStats.size > ugcStats.size) {
+              console.log('✅ List concatenation successful - file size increased');
+              resolve();
+            } else {
+              console.log('⚠️ List concat output seems too small, using UGC only as last resort...');
+              tryUgcOnlyFallback();
+            }
+          } else {
+            console.error('List concat output file was not created!');
+            tryUgcOnlyFallback();
+          }
+        })
+        .on('error', (error) => {
+          console.error('List concatenation failed:', error);
+          
+          // Clean up list file
+          if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
+          
+          tryUgcOnlyFallback();
+        })
+        .run();
+    };
+    
+    // Method 3: Last resort - UGC only
+    const tryUgcOnlyFallback = () => {
+      console.log('🚨 All concatenation methods failed. Using UGC only as fallback...');
       
       try {
         fs.copyFileSync(ugcPath, outputPath);
-        console.log('Fallback: Copied UGC as final video');
+        console.log('⚠️ Fallback successful: Using UGC video only (no demo video)');
         resolve();
       } catch (copyError) {
-        console.error('Fallback copy failed:', copyError);
+        console.error('Even UGC-only fallback failed:', copyError);
         reject(copyError);
       }
-    }, 30000); // 30 second timeout
+    };
     
-    ffmpeg()
-      .input(listPath)
-      .inputOptions(['-f', 'concat', '-safe', '0'])
-      .outputOptions([
-        '-c', 'copy', // Fastest possible
-        '-avoid_negative_ts', 'make_zero'
-      ])
-      .output(outputPath)
-      .on('start', (commandLine) => {
-        console.log('FFmpeg command: ' + commandLine);
-      })
-      .on('progress', (progress) => {
-        console.log('Concatenation progress:', progress.percent || 'unknown');
-      })
-      .on('end', () => {
-        clearTimeout(timeoutId);
-        console.log('Simple concatenation completed successfully');
-        
-        // Check output file
-        if (fs.existsSync(outputPath)) {
-          const outputStats = fs.statSync(outputPath);
-          console.log(`Output file created: ${outputStats.size} bytes`);
-        } else {
-          console.error('Output file was not created!');
-        }
-        
-        // Clean up list file
-        if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
-        resolve();
-      })
-      .on('error', (error) => {
-        clearTimeout(timeoutId);
-        console.error('Simple concatenation failed:', error);
-        console.log('Attempting fallback: UGC only');
-        
-        // Clean up list file
-        if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
-        
-        // Fallback: Just use UGC video
-        try {
-          fs.copyFileSync(ugcPath, outputPath);
-          console.log('Fallback successful: Using UGC video only');
-          resolve();
-        } catch (copyError) {
-          console.error('Fallback copy failed:', copyError);
-          reject(copyError);
-        }
-      })
-      .run();
+    // Start with filter_complex method
+    tryFilterComplexConcat();
   });
 }
 
@@ -396,7 +456,20 @@ async function processVideoBackground(jobId, { ugcVideoUrl, productDemoUrl, hook
 
     // Concatenate UGC (with text) + demo video
     console.log('Concatenating videos...');
-    await concatenateVideosSimple(ugcWithTextPath, demoTempPath, finalVideoPath);
+    
+    try {
+      // Try the enhanced simple concatenation first (more reliable)
+      await concatenateVideosSimple(ugcWithTextPath, demoTempPath, finalVideoPath);
+      console.log('✅ Video concatenation successful');
+    } catch (concatenationError) {
+      console.error('❌ Concatenation failed completely:', concatenationError);
+      
+      // Even if concatenation fails, we still have UGC with text overlay
+      // So copy that as the final video (better than nothing)
+      console.log('📋 Using UGC with text overlay as final video (no demo)');
+      fs.copyFileSync(ugcWithTextPath, finalVideoPath);
+    }
+    
     updateProgress(85);
 
     // Upload to R2
