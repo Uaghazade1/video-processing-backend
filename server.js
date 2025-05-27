@@ -45,8 +45,9 @@ async function downloadVideo(url, outputPath) {
 function addTextOverlay(inputPath, outputPath, text, alignment) {
   return new Promise((resolve, reject) => {
     const cleanText = text.replace(/['"]/g, '');
-    const lines = wrapText(cleanText, 25);
-    const lineSpacing = 50;
+const lines = wrapText(cleanText, 25);
+const formattedText = lines.map(line => line).join('\n');
+
 
     const baseY =
       alignment === 'top' ? 120 :
@@ -58,7 +59,7 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
     const drawtextFilters = lines.map((line, i) => ({
       filter: 'drawtext',
       options: {
-        text: line,
+        text: formattedText,
         fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
         fontsize: 42,
         fontcolor: 'white',
@@ -99,14 +100,11 @@ function wrapText(text, maxCharsPerLine) {
   let currentLine = '';
 
   for (const word of words) {
-    // If adding this word would exceed the line limit
     if ((currentLine + word).length > maxCharsPerLine) {
-      // If current line is not empty, push it and start new line
       if (currentLine.trim()) {
         lines.push(currentLine.trim());
         currentLine = word + ' ';
       } else {
-        // If single word is too long, just add it
         currentLine = word + ' ';
       }
     } else {
@@ -114,17 +112,13 @@ function wrapText(text, maxCharsPerLine) {
     }
   }
 
-  // Add the last line if it exists
   if (currentLine.trim()) {
     lines.push(currentLine.trim());
   }
 
-  // Limit to 3 lines max for mobile video
-  const finalLines = lines.slice(0, 3);
-  
-  // Join with newline characters for FFmpeg
-  return finalLines.join('\n');
+  return lines.slice(0, 3); // sadece array döndür
 }
+
 
 // ROBUST concat that handles audio/video format differences
 function concatenateVideos(ugcPath, demoPath, outputPath) {
