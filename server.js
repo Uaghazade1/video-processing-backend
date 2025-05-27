@@ -47,6 +47,7 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
     const cleanText = text.replace(/['"]/g, '');
 const lines = wrapText(cleanText, 25);
 const formattedText = lines.map(line => line).join('\n');
+const lineSpacing = 50;
 
 
     const baseY =
