@@ -80,14 +80,18 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
           filter: 'drawtext',
           options: {
             text: cleanText,
-            fontsize: 48,
+            fontsize: 32, // Smaller font for less processing
             fontcolor: 'white',
             x: textPosition.split(':')[0],
             y: textPosition.split(':')[1],
-            borderw: 3,
+            borderw: 2, // Thinner border
             bordercolor: 'black'
           }
         }
+      ])
+      .outputOptions([
+        '-preset', 'ultrafast', // Fast encoding
+        '-crf', '28' // Lower quality for speed
       ])
       .output(outputPath)
       .on('end', () => {
@@ -111,9 +115,9 @@ function concatenateVideos(ugcPath, demoPath, outputPath) {
       .input(ugcPath)
       .input(demoPath)
       .complexFilter([
-        // Normalize both videos to same resolution and add silent audio to UGC
-        '[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2[v0]',
-        '[1:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2[v1]',
+        // More memory-efficient: smaller resolution for processing
+        '[0:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2[v0]',
+        '[1:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2[v1]',
         'anullsrc=channel_layout=stereo:sample_rate=44100[silent]',
         '[v0][silent][v1][1:a]concat=n=2:v=1:a=1[outv][outa]'
       ])
@@ -121,7 +125,10 @@ function concatenateVideos(ugcPath, demoPath, outputPath) {
         '-map', '[outv]',
         '-map', '[outa]',
         '-c:v', 'libx264',
+        '-preset', 'ultrafast', // Faster encoding, less CPU
+        '-crf', '28', // Lower quality, faster processing
         '-c:a', 'aac',
+        '-b:a', '128k', // Lower audio bitrate
         '-shortest'
       ])
       .output(outputPath)
