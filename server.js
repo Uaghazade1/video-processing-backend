@@ -100,39 +100,7 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
   });
 }
 
-// Helper function to wrap text into multiple lines
-function wrapText(text, maxCharsPerLine) {
-  const words = text.split(' ');
-  const lines = [];
-  let currentLine = '';
 
-  for (const word of words) {
-    // If adding this word would exceed the line limit
-    if ((currentLine + word).length > maxCharsPerLine) {
-      // If current line is not empty, push it and start new line
-      if (currentLine.trim()) {
-        lines.push(currentLine.trim());
-        currentLine = word + ' ';
-      } else {
-        // If single word is too long, just add it
-        currentLine = word + ' ';
-      }
-    } else {
-      currentLine += word + ' ';
-    }
-  }
-
-  // Add the last line if it exists
-  if (currentLine.trim()) {
-    lines.push(currentLine.trim());
-  }
-
-  // Limit to 3 lines max for mobile video
-  const finalLines = lines.slice(0, 3);
-  
-  // Join with newline characters for FFmpeg
-  return finalLines.join('\\n');
-}
 
 // ROBUST concat that handles audio/video format differences
 function concatenateVideos(ugcPath, demoPath, outputPath) {
