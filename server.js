@@ -45,26 +45,27 @@ async function downloadVideo(url, outputPath) {
 function addTextOverlay(inputPath, outputPath, text, alignment) {
   return new Promise((resolve, reject) => {
     const cleanText = text.replace(/['"]/g, '');
-    const lines = wrapText(cleanText, 25);
-    const lineSpacing = 50; // Define line spacing
+    const lines = wrapText(cleanText, 35);
+    const lineSpacing = 45;
 
     const baseY =
-      alignment === 'top' ? 120 :
-      alignment === 'bottom' ? 'h-200' :
+      alignment === 'top' ? 100 :
+      alignment === 'bottom' ? 'h-250' :
       '(h/2 - ' + ((lines.length - 1) * lineSpacing) / 2 + ')';
 
     console.log(`📝 Adding multiline centered text overlay (${alignment})`);
+    console.log(`📝 Text split into ${lines.length} lines:`, lines);
 
     const drawtextFilters = lines.map((line, i) => ({
       filter: 'drawtext',
       options: {
-        text: line, // Use individual line, not formattedText
+        text: line,
         fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-        fontsize: 32,
+        fontsize: 35,
         fontcolor: 'white',
         x: '(w-text_w)/2',
         y: `(${baseY})+${i * lineSpacing}`,
-        borderw: 4,
+        borderw: 3,
         bordercolor: 'black',
         shadowcolor: 'black',
         shadowx: 2,
@@ -95,11 +96,14 @@ function wrapText(text, maxCharsPerLine) {
   let currentLine = '';
 
   for (const word of words) {
+    // If adding this word would exceed the line limit
     if ((currentLine + word).length > maxCharsPerLine) {
+      // If current line is not empty, push it and start new line
       if (currentLine.trim()) {
         lines.push(currentLine.trim());
         currentLine = word + ' ';
       } else {
+        // If single word is too long, just add it anyway
         currentLine = word + ' ';
       }
     } else {
@@ -107,11 +111,18 @@ function wrapText(text, maxCharsPerLine) {
     }
   }
 
+  // Add the last line if it exists
   if (currentLine.trim()) {
     lines.push(currentLine.trim());
   }
 
-  return lines.slice(0, 3); // sadece array döndür
+  // Allow up to 5 lines for longer text (increased from 3)
+  const finalLines = lines.slice(0, 5);
+  
+  console.log(`📝 Original text: "${text}"`);
+  console.log(`📝 Wrapped into ${finalLines.length} lines:`, finalLines);
+  
+  return finalLines;
 }
 
 // ROBUST concat that handles audio/video format differences
