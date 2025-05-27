@@ -45,7 +45,7 @@ async function downloadVideo(url, outputPath) {
 function addTextOverlay(inputPath, outputPath, text, alignment) {
   return new Promise((resolve, reject) => {
     const cleanText = text.replace(/['"]/g, '');
-    const lines = wrapText(cleanText, 35);
+    const lines = wrapText(cleanText, 25);
     const lineSpacing = 45;
 
     const baseY =
