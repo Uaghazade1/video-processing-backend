@@ -44,41 +44,43 @@ async function downloadVideo(url, outputPath) {
 // Add text overlay to video
 function addTextOverlay(inputPath, outputPath, text, alignment) {
   return new Promise((resolve, reject) => {
-    let textPosition = '(w-text_w)/2:(h-text_h)/2'; // default middle
-    
-    if (alignment === 'top') textPosition = '(w-text_w)/2:120';  
-    if (alignment === 'bottom') textPosition = '(w-text_w)/2:h-200';  
-
-    // Clean text and implement manual word wrapping
     const cleanText = text.replace(/['"]/g, '');
-    const wrappedText = wrapText(cleanText, 25); // ~25 characters per line for mobile video
-    
-    console.log(`📝 Adding text overlay: "${wrappedText}" at ${alignment}`);
+    const lines = wrapText(cleanText, 25);
+    const lineSpacing = 50;
+
+    const baseY =
+      alignment === 'top' ? 120 :
+      alignment === 'bottom' ? 'h-200' :
+      '(h/2 - ' + ((lines.length - 1) * lineSpacing) / 2 + ')';
+
+    console.log(`📝 Adding multiline centered text overlay (${alignment})`);
+
+    const drawtextFilters = lines.map((line, i) => ({
+      filter: 'drawtext',
+      options: {
+        text: line,
+        fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+        fontsize: 42,
+        fontcolor: 'white',
+        x: '(w-text_w)/2',
+        y: `(${baseY})+${i * lineSpacing}`,
+        borderw: 4,
+        bordercolor: 'black',
+        shadowcolor: 'black',
+        shadowx: 2,
+        shadowy: 2,
+        box: 1,
+        boxcolor: 'black@0.3',
+        boxborderw: 15,
+      },
+    }));
 
     ffmpeg(inputPath)
-      .videoFilters({
-        filter: 'drawtext',
-        options: {
-          text: wrappedText,
-          fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-          fontsize: 42,                    // Slightly smaller for multi-line
-          fontcolor: 'white',
-          x: textPosition.split(':')[0],
-          y: textPosition.split(':')[1],
-          borderw: 4,                      
-          bordercolor: 'black',
-          shadowcolor: 'black',
-          shadowx: 2,                      
-          shadowy: 2,
-          box: 1,                          
-          boxcolor: 'black@0.3',           
-          boxborderw: 15                   
-        }
-      })
+      .videoFilters(drawtextFilters)
       .outputOptions(['-preset', 'fast', '-crf', '23'])
       .output(outputPath)
       .on('end', () => {
-        console.log('✅ Text overlay completed with proper line wrapping');
+        console.log('✅ Text overlay completed and centered');
         resolve();
       })
       .on('error', (error) => {
@@ -88,6 +90,7 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
       .run();
   });
 }
+
 
 // Helper function to wrap text into multiple lines
 function wrapText(text, maxCharsPerLine) {
