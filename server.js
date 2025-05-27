@@ -44,13 +44,14 @@ async function downloadVideo(url, outputPath) {
 // Add text overlay to video
 function addTextOverlay(inputPath, outputPath, text, alignment) {
   return new Promise((resolve, reject) => {
-    const lines = wrapText(text, 35); // Orijinal metni kullan
+    const cleanText = text.replace(/['"]/g, '');
+    const lines = wrapText(cleanText, 35);
     const lineSpacing = 45;
 
     const baseY =
       alignment === 'top' ? 100 :
       alignment === 'bottom' ? 'h-250' :
-      `(h/2 - ${(lines.length - 1) * lineSpacing / 2})`;
+      '(h/2 - ' + ((lines.length - 1) * lineSpacing) / 2 + ')';
 
     console.log(`📝 Adding multiline centered text overlay (${alignment})`);
     console.log(`📝 Text split into ${lines.length} lines:`, lines);
@@ -63,13 +64,12 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
         fontsize: 35,
         fontcolor: 'white',
         x: '(w-text_w)/2',
-        y: `${baseY}+${i * lineSpacing}`,
+        y: `(${baseY})+${i * lineSpacing}`,
         borderw: 3,
         bordercolor: 'black',
         shadowcolor: 'black',
         shadowx: 2,
         shadowy: 2,
-        escape: 0 // özel karakterler ve emojiler için escape kapalı
       },
     }));
 
@@ -77,9 +77,6 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
       .videoFilters(drawtextFilters)
       .outputOptions(['-preset', 'fast', '-crf', '23'])
       .output(outputPath)
-      .on('start', commandLine => {
-        console.log(`🚀 FFmpeg command: ${commandLine}`);
-      })
       .on('end', () => {
         console.log('✅ Text overlay completed and centered');
         resolve();
@@ -91,7 +88,6 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
       .run();
   });
 }
-
 
 // Helper function to wrap text into multiple lines
 function wrapText(text, maxCharsPerLine) {
