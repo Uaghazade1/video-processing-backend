@@ -147,6 +147,42 @@ function concatenateVideos(ugcPath, demoPath, outputPath) {
   });
 }
 
+// Simple concatenation - minimal processing
+function concatenateVideosSimple(ugcPath, demoPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    console.log('Starting simple video concatenation...');
+    
+    // Create a simple list file
+    const listContent = `file '${ugcPath}'\nfile '${demoPath}'`;
+    const listPath = outputPath + '.list';
+    
+    fs.writeFileSync(listPath, listContent);
+    
+    ffmpeg()
+      .input(listPath)
+      .inputOptions(['-f', 'concat', '-safe', '0'])
+      .outputOptions([
+        '-c', 'copy', // Copy streams without re-encoding (fastest)
+        '-avoid_negative_ts', 'make_zero'
+      ])
+      .output(outputPath)
+      .on('progress', (progress) => {
+        console.log('Simple concatenation progress:', progress.percent);
+      })
+      .on('end', () => {
+        console.log('Simple concatenation completed');
+        fs.unlinkSync(listPath); // Clean up list file
+        resolve();
+      })
+      .on('error', (error) => {
+        console.error('Simple concatenation failed:', error);
+        if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
+        reject(error);
+      })
+      .run();
+  });
+}
+
 // Upload to Cloudflare R2
 async function uploadToR2(filePath, fileName) {
   try {
@@ -215,7 +251,6 @@ async function processVideoBackground(jobId, { ugcVideoUrl, productDemoUrl, hook
     const timestamp = Date.now();
     const ugcTempPath = path.join(TEMP_DIR, `ugc-${timestamp}.mp4`);
     const demoTempPath = path.join(TEMP_DIR, `demo-${timestamp}.mp4`);
-    const ugcWithTextPath = path.join(TEMP_DIR, `ugc-with-text-${timestamp}.mp4`);
     const finalVideoPath = path.join(TEMP_DIR, `final-${timestamp}.mp4`);
     
     // Update progress
@@ -226,23 +261,21 @@ async function processVideoBackground(jobId, { ugcVideoUrl, productDemoUrl, hook
       }
     };
 
+    console.log(`Starting minimal processing for job ${jobId}`);
     updateProgress(10);
 
     // Download UGC video
     await downloadVideo(ugcVideoUrl, ugcTempPath);
-    updateProgress(25);
+    updateProgress(30);
 
     // Download product demo video
     await downloadVideo(productDemoUrl, demoTempPath);
-    updateProgress(40);
+    updateProgress(50);
 
-    // Add text overlay to UGC video
-    await addTextOverlay(ugcTempPath, ugcWithTextPath, hook, textAlignment);
-    updateProgress(65);
-
-    // Concatenate videos
-    await concatenateVideos(ugcWithTextPath, demoTempPath, finalVideoPath);
-    updateProgress(85);
+    // Simple concatenation - NO TEXT OVERLAY for now
+    console.log('Starting simple concatenation...');
+    await concatenateVideosSimple(ugcTempPath, demoTempPath, finalVideoPath);
+    updateProgress(80);
 
     // Upload to R2
     const fileName = `generated-ugc-${timestamp}.mp4`;
@@ -253,7 +286,6 @@ async function processVideoBackground(jobId, { ugcVideoUrl, productDemoUrl, hook
     await Promise.all([
       fs.remove(ugcTempPath).catch(() => {}),
       fs.remove(demoTempPath).catch(() => {}),
-      fs.remove(ugcWithTextPath).catch(() => {}),
       fs.remove(finalVideoPath).catch(() => {})
     ]);
 
