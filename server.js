@@ -49,20 +49,19 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
     if (alignment === 'top') textPosition = '(w-text_w)/2:120';  
     if (alignment === 'bottom') textPosition = '(w-text_w)/2:h-200';  
 
-    // Clean and prepare text - break long lines
-    const cleanText = text
-      .replace(/['"]/g, '')
-      .slice(0, 120); // Shorter text to prevent overflow
+    // Clean text and implement manual word wrapping
+    const cleanText = text.replace(/['"]/g, '');
+    const wrappedText = wrapText(cleanText, 25); // ~25 characters per line for mobile video
     
-    console.log(`📝 Adding text overlay: "${cleanText}" at ${alignment}`);
+    console.log(`📝 Adding text overlay: "${wrappedText}" at ${alignment}`);
 
     ffmpeg(inputPath)
       .videoFilters({
         filter: 'drawtext',
         options: {
-          text: cleanText,
+          text: wrappedText,
           fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-          fontsize: 48,                    // Reasonable size
+          fontsize: 42,                    // Slightly smaller for multi-line
           fontcolor: 'white',
           x: textPosition.split(':')[0],
           y: textPosition.split(':')[1],
@@ -73,13 +72,13 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
           shadowy: 2,
           box: 1,                          
           boxcolor: 'black@0.3',           
-          boxborderw: 12                   
+          boxborderw: 15                   
         }
       })
       .outputOptions(['-preset', 'fast', '-crf', '23'])
       .output(outputPath)
       .on('end', () => {
-        console.log('✅ Text overlay completed successfully');
+        console.log('✅ Text overlay completed with proper line wrapping');
         resolve();
       })
       .on('error', (error) => {
@@ -88,6 +87,40 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
       })
       .run();
   });
+}
+
+// Helper function to wrap text into multiple lines
+function wrapText(text, maxCharsPerLine) {
+  const words = text.split(' ');
+  const lines = [];
+  let currentLine = '';
+
+  for (const word of words) {
+    // If adding this word would exceed the line limit
+    if ((currentLine + word).length > maxCharsPerLine) {
+      // If current line is not empty, push it and start new line
+      if (currentLine.trim()) {
+        lines.push(currentLine.trim());
+        currentLine = word + ' ';
+      } else {
+        // If single word is too long, just add it
+        currentLine = word + ' ';
+      }
+    } else {
+      currentLine += word + ' ';
+    }
+  }
+
+  // Add the last line if it exists
+  if (currentLine.trim()) {
+    lines.push(currentLine.trim());
+  }
+
+  // Limit to 3 lines max for mobile video
+  const finalLines = lines.slice(0, 3);
+  
+  // Join with newline characters for FFmpeg
+  return finalLines.join('\\n');
 }
 
 // ROBUST concat that handles audio/video format differences
