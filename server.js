@@ -362,6 +362,7 @@ async function processVideoBackground(jobId, { ugcVideoUrl, productDemoUrl, hook
   try {
     const timestamp = Date.now();
     const ugcTempPath = path.join(TEMP_DIR, `ugc-${timestamp}.mp4`);
+    const ugcWithTextPath = path.join(TEMP_DIR, `ugc-text-${timestamp}.mp4`);
     const demoTempPath = path.join(TEMP_DIR, `demo-${timestamp}.mp4`);
     const finalVideoPath = path.join(TEMP_DIR, `final-${timestamp}.mp4`);
     
@@ -373,31 +374,41 @@ async function processVideoBackground(jobId, { ugcVideoUrl, productDemoUrl, hook
       }
     };
 
-    console.log(`Starting ULTRA minimal processing for job ${jobId}`);
+    console.log(`Starting video processing with text overlay and concatenation for job ${jobId}`);
+    console.log(`Hook text: "${hook}"`);
+    console.log(`Text alignment: ${textAlignment}`);
     updateProgress(10);
 
     // Download UGC video
+    console.log('Downloading UGC video...');
     await downloadVideo(ugcVideoUrl, ugcTempPath);
-    updateProgress(40);
+    updateProgress(30);
 
-    // Download product demo video (but don't use it for now)
-    console.log('Downloading demo video for future use...');
+    // Download product demo video
+    console.log('Downloading demo video...');
     await downloadVideo(productDemoUrl, demoTempPath);
-    updateProgress(60);
+    updateProgress(50);
 
-    // For now, just use UGC video as final video (no concatenation)
-    console.log('Copying UGC as final video (no concatenation for stability)...');
-    fs.copyFileSync(ugcTempPath, finalVideoPath);
-    updateProgress(80);
+    // Add text overlay to UGC video
+    console.log('Adding text overlay to UGC video...');
+    await addTextOverlay(ugcTempPath, ugcWithTextPath, hook, textAlignment);
+    updateProgress(70);
+
+    // Concatenate UGC (with text) + demo video
+    console.log('Concatenating videos...');
+    await concatenateVideosSimple(ugcWithTextPath, demoTempPath, finalVideoPath);
+    updateProgress(85);
 
     // Upload to R2
-    const fileName = `generated-ugc-${timestamp}.mp4`;
+    console.log('Uploading final video to R2...');
+    const fileName = `generated-video-${timestamp}.mp4`;
     const videoUrl = await uploadToR2(finalVideoPath, fileName);
     updateProgress(95);
 
     // Clean up temp files
     await Promise.all([
       fs.remove(ugcTempPath).catch(() => {}),
+      fs.remove(ugcWithTextPath).catch(() => {}),
       fs.remove(demoTempPath).catch(() => {}),
       fs.remove(finalVideoPath).catch(() => {})
     ]);
@@ -411,10 +422,21 @@ async function processVideoBackground(jobId, { ugcVideoUrl, productDemoUrl, hook
       videoUrl 
     });
 
-    console.log(`ULTRA minimal processing completed for job ${jobId}`);
+    console.log(`Video processing completed successfully for job ${jobId}`);
+    console.log(`Final video URL: ${videoUrl}`);
 
   } catch (error) {
     console.error(`Video processing failed for job ${jobId}:`, error);
+    
+    // Clean up temp files on error
+    const timestamp = Date.now();
+    await Promise.all([
+      fs.remove(path.join(TEMP_DIR, `ugc-${timestamp}.mp4`)).catch(() => {}),
+      fs.remove(path.join(TEMP_DIR, `ugc-text-${timestamp}.mp4`)).catch(() => {}),
+      fs.remove(path.join(TEMP_DIR, `demo-${timestamp}.mp4`)).catch(() => {}),
+      fs.remove(path.join(TEMP_DIR, `final-${timestamp}.mp4`)).catch(() => {})
+    ]);
+    
     jobs.set(jobId, { 
       status: 'failed', 
       progress: 0,
