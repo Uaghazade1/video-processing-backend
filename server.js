@@ -46,8 +46,8 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
   return new Promise((resolve, reject) => {
     let textPosition = '(w-text_w)/2:(h-text_h)/2'; // default middle
     
-    if (alignment === 'top') textPosition = '(w-text_w)/2:50';
-    if (alignment === 'bottom') textPosition = '(w-text_w)/2:h-100';
+    if (alignment === 'top') textPosition = '(w-text_w)/2:100';  // Adjust for better positioning
+    if (alignment === 'bottom') textPosition = '(w-text_w)/2:h-120';  // Adjust for better positioning
 
     const cleanText = text.replace(/['"]/g, '').slice(0, 100);
     
@@ -58,18 +58,25 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
         filter: 'drawtext',
         options: {
           text: cleanText,
-          fontsize: 40,
+          fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', // Bold system font
+          fontsize: 48,                    // Larger font size
           fontcolor: 'white',
           x: textPosition.split(':')[0],
           y: textPosition.split(':')[1],
-          borderw: 3,
-          bordercolor: 'black'
+          borderw: 4,                      // Thicker border (matches WebkitTextStroke: 3px)
+          bordercolor: 'black',
+          shadowcolor: 'black',            // Text shadow
+          shadowx: 2,
+          shadowy: 2,
+          box: 1,                          // Background box for better readability
+          boxcolor: 'black@0.3',           // Semi-transparent black background
+          boxborderw: 8                    // Box padding
         }
       })
-      .outputOptions(['-preset', 'ultrafast', '-crf', '28'])
+      .outputOptions(['-preset', 'fast', '-crf', '23'])  // Better quality
       .output(outputPath)
       .on('end', () => {
-        console.log('✅ Text overlay completed');
+        console.log('✅ Text overlay completed with enhanced styling');
         resolve();
       })
       .on('error', reject)
