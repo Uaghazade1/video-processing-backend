@@ -45,10 +45,8 @@ async function downloadVideo(url, outputPath) {
 function addTextOverlay(inputPath, outputPath, text, alignment) {
   return new Promise((resolve, reject) => {
     const cleanText = text.replace(/['"]/g, '');
-const lines = wrapText(cleanText, 25);
-const formattedText = lines.map(line => line).join('\n');
-const lineSpacing = 50;
-
+    const lines = wrapText(cleanText, 25);
+    const lineSpacing = 50; // Define line spacing
 
     const baseY =
       alignment === 'top' ? 120 :
@@ -60,7 +58,7 @@ const lineSpacing = 50;
     const drawtextFilters = lines.map((line, i) => ({
       filter: 'drawtext',
       options: {
-        text: formattedText,
+        text: line, // Use individual line, not formattedText
         fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
         fontsize: 42,
         fontcolor: 'white',
@@ -93,7 +91,6 @@ const lineSpacing = 50;
   });
 }
 
-
 // Helper function to wrap text into multiple lines
 function wrapText(text, maxCharsPerLine) {
   const words = text.split(' ');
@@ -119,7 +116,6 @@ function wrapText(text, maxCharsPerLine) {
 
   return lines.slice(0, 3); // sadece array döndür
 }
-
 
 // ROBUST concat that handles audio/video format differences
 function concatenateVideos(ugcPath, demoPath, outputPath) {
