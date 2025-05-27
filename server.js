@@ -61,7 +61,7 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
       options: {
         text: line,
         fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-        fontsize: 35,
+        fontsize: 32,
         fontcolor: 'white',
         x: '(w-text_w)/2',
         y: `(${baseY})+${i * lineSpacing}`,
