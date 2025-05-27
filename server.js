@@ -46,10 +46,10 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
   return new Promise((resolve, reject) => {
     let textPosition = '(w-text_w)/2:(h-text_h)/2'; // default middle
     
-    if (alignment === 'top') textPosition = '(w-text_w)/2:100';  // Adjust for better positioning
-    if (alignment === 'bottom') textPosition = '(w-text_w)/2:h-120';  // Adjust for better positioning
+    if (alignment === 'top') textPosition = '(w-text_w)/2:120';  
+    if (alignment === 'bottom') textPosition = '(w-text_w)/2:h-200';  
 
-    const cleanText = text.replace(/['"]/g, '').slice(0, 100);
+    const cleanText = text.replace(/['"]/g, '').slice(0, 150); // Reasonable text length
     
     console.log(`📝 Adding text overlay: "${cleanText}" at ${alignment}`);
 
@@ -58,25 +58,29 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
         filter: 'drawtext',
         options: {
           text: cleanText,
-          fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', // Bold system font
-          fontsize: 48,                    // Larger font size
+          fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+          fontsize: 56,                    // Slightly smaller for better fit
           fontcolor: 'white',
           x: textPosition.split(':')[0],
           y: textPosition.split(':')[1],
-          borderw: 4,                      // Thicker border (matches WebkitTextStroke: 3px)
+          borderw: 5,                      
           bordercolor: 'black',
-          shadowcolor: 'black',            // Text shadow
-          shadowx: 2,
-          shadowy: 2,
-          box: 1,                          // Background box for better readability
-          boxcolor: 'black@0.3',           // Semi-transparent black background
-          boxborderw: 8                    // Box padding
+          shadowcolor: 'black',
+          shadowx: 3,                      
+          shadowy: 3,
+          line_spacing: 8,                 
+          text_align: 'center',
+          text_w: 'w-80',                  // Text width with 40px padding on each side
+          text_h: 'h',                     // Allow text height to adjust
+          box: 1,                          // Add subtle background for readability
+          boxcolor: 'black@0.2',           // Very light background
+          boxborderw: 15                   // Padding around text
         }
       })
-      .outputOptions(['-preset', 'fast', '-crf', '23'])  // Better quality
+      .outputOptions(['-preset', 'fast', '-crf', '23'])
       .output(outputPath)
       .on('end', () => {
-        console.log('✅ Text overlay completed with enhanced styling');
+        console.log('✅ Text overlay completed with proper padding and wrapping');
         resolve();
       })
       .on('error', reject)
