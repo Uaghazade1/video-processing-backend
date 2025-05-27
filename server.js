@@ -49,7 +49,7 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
     if (alignment === 'top') textPosition = '(w-text_w)/2:120';  
     if (alignment === 'bottom') textPosition = '(w-text_w)/2:h-200';  
 
-    // Clean text but preserve emojis - only remove problematic quotes
+    // Clean text and implement manual word wrapping
     const cleanText = text.replace(/['"]/g, '');
     const wrappedText = wrapText(cleanText, 25); // ~25 characters per line for mobile video
     
@@ -61,7 +61,7 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
         options: {
           text: wrappedText,
           fontfile: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-          fontsize: 42,                    
+          fontsize: 42,                    // Slightly smaller for multi-line
           fontcolor: 'white',
           x: textPosition.split(':')[0],
           y: textPosition.split(':')[1],
@@ -72,13 +72,13 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
           shadowy: 2,
           box: 1,                          
           boxcolor: 'black@0.3',           
-          boxborderw: 15
+          boxborderw: 15                   
         }
       })
       .outputOptions(['-preset', 'fast', '-crf', '23'])
       .output(outputPath)
       .on('end', () => {
-        console.log('✅ Text overlay completed with emoji support');
+        console.log('✅ Text overlay completed with proper line wrapping');
         resolve();
       })
       .on('error', (error) => {
@@ -119,8 +119,8 @@ function wrapText(text, maxCharsPerLine) {
   // Limit to 3 lines max for mobile video
   const finalLines = lines.slice(0, 3);
   
-  // Join with escaped newline characters for FFmpeg
-  return finalLines.join('\\n');
+  // Join with newline characters for FFmpeg
+  return finalLines.join('\n');
 }
 
 // ROBUST concat that handles audio/video format differences
