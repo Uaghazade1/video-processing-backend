@@ -49,8 +49,8 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
     const lineSpacing = 45;
 
     const baseY =
-      alignment === 'top' ? 250 :
-      alignment === 'bottom' ? 'h-350' :
+      alignment === 'top' ? 270 :
+      alignment === 'bottom' ? 'h-370' :
       '(h/2 - ' + ((lines.length - 1) * lineSpacing) / 2 + ')';
 
     console.log(`📝 Adding multiline centered text overlay (${alignment})`);
@@ -176,7 +176,7 @@ function normalizeVideo(inputPath, outputPath) {
         '-c:v', 'libx264',
         '-preset', 'fast',
         '-crf', '23',
-        '-vf', 'scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,fps=30',
+        '-vf', 'scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,fps=30',
         '-c:a', 'aac',
         '-ar', '44100',
         '-ac', '2',
