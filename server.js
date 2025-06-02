@@ -44,7 +44,17 @@ async function downloadVideo(url, outputPath) {
 // Add text overlay to video
 function addTextOverlay(inputPath, outputPath, text, alignment) {
   return new Promise((resolve, reject) => {
-    const cleanText = text.replace(/['"]/g, '');
+    // Clean and escape text for FFmpeg drawtext filter
+    // Remove problematic characters and escape FFmpeg special characters
+    const cleanText = text
+      .replace(/['"]/g, '')  // Remove quotes
+      .replace(/:/g, '\\:')  // Escape colons for FFmpeg
+      .replace(/\\/g, '\\\\')  // Escape backslashes
+      .replace(/\[/g, '\\[')  // Escape square brackets
+      .replace(/\]/g, '\\]')  // Escape square brackets
+      .replace(/%/g, '\\%')   // Escape percent signs
+      .trim();
+    
     const lines = wrapText(cleanText, 25);
     const lineSpacing = 45;
 
@@ -54,6 +64,8 @@ function addTextOverlay(inputPath, outputPath, text, alignment) {
       '(h/2 - ' + ((lines.length - 1) * lineSpacing) / 2 + ')';
 
     console.log(`📝 Adding multiline centered text overlay (${alignment})`);
+    console.log(`📝 Original text: "${text}"`);
+    console.log(`📝 Cleaned text: "${cleanText}"`);
     console.log(`📝 Text split into ${lines.length} lines:`, lines);
 
     const drawtextFilters = lines.map((line, i) => ({
